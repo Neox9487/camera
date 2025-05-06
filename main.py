@@ -1,28 +1,34 @@
+import asyncio
+from fastapi import FastAPI, WebSocket
+from io import BytesIO
+from modules import CameraManager
 import cv2 as cv
-import threading as thread
-import numpy as np
-import logging as log
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
-app.add_middleware(
-  CORSMiddleware,
-  allow_origins=["*"],
-  allow_credentials=True,
-  allow_methods=["*"],
-  allow_headers=["*"],
-)
+camera_manager = CameraManager()
 
-@app.get("/mask")
-def get_mask():
-    pass
+async def send_frame(websocket, camera_id):
+  camera = camera_manager.get_camera(camera_id)
+  try:
+    while True:
+      frame = camera.get_frame()
+      ret, jpeg_frame = cv.imencode('.jpg', frame)
+      if not ret:
+        raise RuntimeError("Failed to encode frame")
+          
+      jpeg_bytes = jpeg_frame.tobytes()
+      await websocket.send_bytes(jpeg_bytes)  
+      await asyncio.sleep(0.1)  
+  except Exception as e:
+    print(f"Error: {e}")
+  finally:
+    camera.release()
 
-@app.get("/frame")
-def get_frame():
-    pass
+@app.websocket("/ws/{camera_id}")
+async def websocket_endpoint(websocket: WebSocket, camera_id: int):
+  await websocket.accept()
+  await send_frame(websocket, camera_id)
 
-@app.get("/")
-def read_root():
-    pass
+if __name__ == "__main__":
+  import uvicorn
+  uvicorn.run(app, host="0.0.0.0", port=8000)
