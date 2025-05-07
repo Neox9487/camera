@@ -18,7 +18,7 @@ async def send_frame(websocket, camera_id):
           
       jpeg_bytes = jpeg_frame.tobytes()
       await websocket.send_bytes(jpeg_bytes)  
-      await asyncio.sleep(0.1)  
+      await asyncio.sleep(0.01)  
   except Exception as e:
     print(f"Error: {e}")
   finally:
